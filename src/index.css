@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  @apply bg-light text-light-text font-sans antialiased;
+  -webkit-tap-highlight-color: transparent;
+  /* No rubber-band bounce revealing a white page behind the app */
+  overscroll-behavior-y: none;
+}
+
+/* iOS zooms into inputs with text smaller than 16px */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* The dark gradient surface behind every screen header (Hero in the app) */
+.hero {
+  background:
+    radial-gradient(circle at 90% 0%, rgba(142, 102, 255, 0.6), rgba(142, 102, 255, 0) 150px),
+    radial-gradient(circle at 0% 100%, rgba(249, 96, 59, 0.3), rgba(249, 96, 59, 0) 120px),
+    linear-gradient(135deg, #17132b, #3a2196);
+}
+
+.tap {
+  @apply transition-transform duration-100 active:scale-[0.97];
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-sheet-up {
+  animation: sheet-up 0.25s ease-out;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
