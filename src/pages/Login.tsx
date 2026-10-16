@@ -61,8 +61,8 @@ export default function LoginPage() {
         <div className="mt-6 bg-white/10 border border-white/15 rounded-2xl px-4 py-3 flex items-start text-white">
           <Smartphone size={18} className="mr-3 mt-0.5 shrink-0 text-white/80" />
           <p className="text-[13px] leading-[18px] text-white/80">
-            <span className="font-bold text-white">Students:</span> mark attendance in the mobile app. Student accounts
-            cannot sign in here. New accounts are also created in the app.
+            <span className="font-bold text-white">Students:</span> sign up and mark attendance in the mobile app.
+            Student accounts cannot sign in here.
           </p>
         </div>
       }
@@ -103,6 +103,12 @@ export default function LoginPage() {
             Forgot password?
           </Link>
         </div>
+        <p className="mt-4 text-center text-light-muted text-sm">
+          New faculty?{' '}
+          <Link to="/register" className="text-primary font-bold">
+            Create an account
+          </Link>
+        </p>
       </form>
     </AuthShell>
   );

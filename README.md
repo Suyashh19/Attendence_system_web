@@ -13,8 +13,9 @@ Same backend (Render) and database (Neon) as the mobile app.
 - Per subject: students with attendance %, enrollment requests, past lectures
 - Reports: recent classes and Excel downloads by date range
 - Profile: change password, sign out, delete account
+- Faculty sign-up with an email code (any email address)
 
-Not on the web: sign-up and moving an account to a new phone (app only).
+Not on the web: student sign-up and moving an account to a new phone (app only).
 
 ## Run locally
 

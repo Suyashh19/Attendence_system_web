@@ -4,6 +4,7 @@ import { TabLayout, ServerWakeBanner } from './components/Layout';
 import { DialogHost } from './components/Dialog';
 import LoginPage from './pages/Login';
 import ForgotPasswordPage from './pages/ForgotPassword';
+import RegisterPage from './pages/Register';
 import HomePage from './pages/Home';
 import SubjectPage from './pages/Subject';
 import LecturePage from './pages/Lecture';
@@ -27,6 +28,7 @@ export default function App() {
       <Routes>
         <Route element={<GuestOnly />}>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
         </Route>
         {/* Reachable signed in too, from Update Password */}
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />

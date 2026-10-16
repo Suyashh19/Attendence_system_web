@@ -7,6 +7,17 @@ export async function loginUser(payload: { email: string; password: string }): P
   return data;
 }
 
+export async function sendSignupOtp(email: string) {
+  const { data } = await api.post('/auth/send-signup-otp', { email });
+  return data;
+}
+
+// The web app only creates faculty accounts; the backend refuses anything else here
+export async function registerFaculty(payload: { name: string; email: string; password: string; otp: string }) {
+  const { data } = await api.post('/auth/register', { ...payload, role: 'faculty', platform: 'web' });
+  return data;
+}
+
 export async function forgotPassword(email: string): Promise<{ message?: string }> {
   const { data } = await api.post('/auth/forgot-password', { email });
   return data;
