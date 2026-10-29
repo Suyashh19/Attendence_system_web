@@ -247,15 +247,15 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
             role="tab"
             aria-selected={selected}
             onClick={() => onChange(key)}
-            className={`flex-1 h-10 rounded-xl text-sm font-bold flex items-center justify-center transition-colors ${
+            className={`flex-1 min-w-0 h-10 px-1 rounded-xl text-[13px] font-bold flex items-center justify-center transition-colors ${
               selected ? 'bg-primary text-white' : 'text-light-muted'
             }`}
           >
-            {Icon && <Icon size={16} className="mr-1.5" />}
-            {label}
+            {Icon && <Icon size={15} className="mr-1 shrink-0" />}
+            <span className="truncate">{label}</span>
             {!!badge && (
               <span
-                className={`ml-1.5 min-w-5 h-5 px-1.5 rounded-full text-[11px] flex items-center justify-center ${
+                className={`ml-1 min-w-[18px] h-[18px] px-1 shrink-0 rounded-full text-[10px] flex items-center justify-center ${
                   selected ? 'bg-white/25 text-white' : 'bg-gold text-white'
                 }`}
               >

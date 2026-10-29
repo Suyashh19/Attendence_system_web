@@ -85,8 +85,8 @@ export function ScreenHeader({ title, subtitle, eyebrow, back = false, right, ch
         )}
         <div className="flex-1 min-w-0">
           {eyebrow && <p className="text-white/60 text-[11px] font-bold tracking-widest mb-1">{eyebrow}</p>}
-          <h1 className="text-[22px] font-extrabold truncate">{title}</h1>
-          {subtitle && <p className="text-white/70 text-[13px] font-medium mt-0.5 truncate">{subtitle}</p>}
+          <h1 className="text-xl font-extrabold leading-6 line-clamp-2">{title}</h1>
+          {subtitle && <p className="text-white/70 text-[13px] font-medium mt-0.5 line-clamp-2">{subtitle}</p>}
         </div>
         {right}
       </div>

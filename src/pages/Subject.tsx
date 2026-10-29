@@ -296,16 +296,14 @@ function SubjectView({ subject }: { subject: Subject }) {
         title={subject.name}
         subtitle={subjectSubtitle(subject)}
         back
-        right={
-          <div className="flex ml-3 shrink-0">
-            <HeaderButton icon={Pencil} label="Edit subject" onClick={() => setShowEdit(true)} />
-            <HeaderButton icon={Share2} label="Share subject code" onClick={() => void shareSubjectCode(subject)} />
-            <HeaderButton icon={Copy} label="Duplicate subject" onClick={() => setShowDuplicate(true)} />
-            <HeaderButton icon={Trash2} label="Delete subject" onClick={confirmDelete} busy={deleting} />
-          </div>
-        }
       >
-        <div className="flex gap-2 mt-5">
+        <div className="flex gap-2 mt-4">
+          <HeaderButton icon={Pencil} label="Edit" onClick={() => setShowEdit(true)} />
+          <HeaderButton icon={Share2} label="Share" onClick={() => void shareSubjectCode(subject)} />
+          <HeaderButton icon={Copy} label="Copy" onClick={() => setShowDuplicate(true)} />
+          <HeaderButton icon={Trash2} label="Delete" onClick={confirmDelete} busy={deleting} />
+        </div>
+        <div className="flex gap-2 mt-3">
           <Stat value={approved.length} label="Students" />
           <Stat value={pending.length} label="Requests" highlight={pending.length > 0} />
           <Stat value={lowCount} label={`Below ${MIN_ATTENDANCE_PERCENT}%`} highlight={lowCount > 0} />
@@ -462,10 +460,11 @@ function HeaderButton({ icon: Icon, label, onClick, busy }: { icon: typeof Penci
       type="button"
       onClick={onClick}
       disabled={busy}
-      aria-label={label}
-      className="w-10 h-10 bg-white/10 border border-white/15 rounded-full flex items-center justify-center ml-2"
+      aria-label={`${label} subject`}
+      className="tap flex-1 h-10 bg-white/10 border border-white/15 rounded-full flex items-center justify-center text-[13px] font-bold"
     >
-      {busy ? <Loader2 size={17} className="animate-spin" /> : <Icon size={17} />}
+      {busy ? <Loader2 size={16} className="animate-spin" /> : <Icon size={16} className="mr-1.5" />}
+      {!busy && label}
     </button>
   );
 }

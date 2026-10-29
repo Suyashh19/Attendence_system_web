@@ -217,22 +217,22 @@ export default function HomePage() {
       <header className="hero rounded-b-[32px] px-5 pb-6 text-white mb-3" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 16px)' }}>
         <div className="flex items-center">
           <Avatar name={user?.name} size={48} onDark />
-          <h1 className="flex-1 mx-3 text-[22px] font-extrabold truncate">Hello, {firstName}</h1>
+          <h1 className="flex-1 min-w-0 mx-2.5 text-xl font-extrabold truncate">Hello, {firstName}</h1>
           <button
             type="button"
             onClick={() => refetch()}
             aria-label="Refresh"
-            className="w-11 h-11 rounded-full bg-white/10 border border-white/15 flex items-center justify-center mr-2"
+            className="w-10 h-10 rounded-full bg-white/10 border border-white/15 flex items-center justify-center mr-2 shrink-0"
           >
             <RefreshCw size={18} className={isFetching ? 'animate-spin' : ''} />
           </button>
           <button
             type="button"
             onClick={() => setShowCreate(true)}
-            className="tap bg-white text-primary h-11 pl-3 pr-4 rounded-full flex items-center text-sm font-bold"
+            className="tap bg-white text-primary h-10 pl-2.5 pr-3.5 rounded-full flex items-center text-sm font-bold shrink-0"
           >
-            <Plus size={18} className="mr-1.5" />
-            New subject
+            <Plus size={18} className="mr-1" />
+            New
           </button>
         </div>
 
@@ -273,7 +273,7 @@ export default function HomePage() {
           <SearchFilterBar
             value={search}
             onChange={setSearch}
-            placeholder="Search by name or code"
+            placeholder="Search name or code"
             filterCount={filterCount}
             onOpenFilters={() => setShowFilters(true)}
             summary={filterSummary(filtered.length, filters)}
@@ -390,10 +390,10 @@ function SubjectCard({ subject, live, onOpen, onStart }: { subject: Subject; liv
           {practical ? <FlaskConical size={22} /> : <BookOpen size={22} />}
         </span>
         <span className="flex-1 min-w-0 mr-2">
-          <span className="block text-light-text font-bold text-base truncate">{subject.name}</span>
-          <span className="flex items-center mt-1">
-            <span className="bg-light px-2 py-0.5 rounded-md mr-2 text-light-muted text-[11px] font-bold tracking-wide shrink-0">{subject.code}</span>
-            <span className="text-light-muted text-xs font-medium truncate">{subjectMeta(subject)}</span>
+          <span className="block text-light-text font-bold text-base leading-5 line-clamp-2">{subject.name}</span>
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+            <span className="bg-light px-2 py-0.5 rounded-md text-light-muted text-[11px] font-bold tracking-wide shrink-0">{subject.code}</span>
+            <span className="text-light-muted text-xs font-medium">{subjectMeta(subject)}</span>
           </span>
         </span>
         {live && (

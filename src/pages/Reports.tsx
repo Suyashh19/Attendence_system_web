@@ -76,8 +76,8 @@ export default function ReportsPage() {
       <div className="px-4 pt-5">
         <SegmentedControl
           options={[
-            { key: 'reports' as const, label: 'Download reports', icon: Download },
-            { key: 'recent' as const, label: 'Recent classes', icon: Clock },
+            { key: 'reports' as const, label: 'Reports', icon: Download },
+            { key: 'recent' as const, label: 'Recent', icon: Clock },
           ]}
           value={tab}
           onChange={setTab}
@@ -89,7 +89,7 @@ export default function ReportsPage() {
             <SearchFilterBar
               value={query}
               onChange={setQuery}
-              placeholder="Search by subject name or code"
+              placeholder="Search subject or code"
               filterCount={filterCount}
               onOpenFilters={() => setShowFilters(true)}
               summary={filterSummary(filteredSubjects.length, filters)}
@@ -103,7 +103,7 @@ export default function ReportsPage() {
             <SearchFilterBar
               value={recentQuery}
               onChange={setRecentQuery}
-              placeholder="Search by subject or date, e.g. 12 oct"
+              placeholder="Subject or date, e.g. 12 oct"
               filterCount={recentFilterCount}
               onOpenFilters={() => setShowFilters(true)}
               summary={recentSummary(visibleRecent.length, recentFilters, recentQuery, recentSubject?.name)}
@@ -136,8 +136,8 @@ export default function ReportsPage() {
                       <span className="text-lg font-extrabold leading-tight">{start.getDate()}</span>
                     </span>
                     <span className="flex-1 min-w-0 mr-3">
-                      <span className="block text-light-text font-bold text-base truncate">{session.subjectName}</span>
-                      <span className="block text-light-muted text-xs font-medium mt-1 truncate">
+                      <span className="block text-light-text font-bold text-base leading-5 line-clamp-2">{session.subjectName}</span>
+                      <span className="block text-light-muted text-xs font-medium mt-1">
                         {session.subjectCode} · {session.subjectType === 'theory' ? 'Theory' : 'Practical'} ·{' '}
                         {start.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
                       </span>
@@ -187,8 +187,8 @@ export default function ReportsPage() {
                   {practical ? <FlaskConical size={20} /> : <BookOpen size={20} />}
                 </span>
                 <div className="flex-1 min-w-0 mr-3">
-                  <p className="text-light-text font-bold text-base truncate">{subject.name}</p>
-                  <p className="text-light-muted text-xs font-medium mt-1 truncate">
+                  <p className="text-light-text font-bold text-base leading-5 line-clamp-2">{subject.name}</p>
+                  <p className="text-light-muted text-xs font-medium mt-1">
                     {subject.code} · {practical ? 'Practical' : 'Theory'}
                     {subject.span ? ` · ${subject.span}` : ''}
                   </p>
