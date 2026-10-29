@@ -30,7 +30,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
         </Route>
-        {/* Reachable signed in too, from Update Password */}
+        {/* For anyone who forgot their password and cannot sign in */}
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
         <Route element={<RequireAuth />}>

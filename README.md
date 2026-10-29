@@ -2,17 +2,21 @@
 
 Faculty-only web version of the Attendance System, for faculty on iPhone until a native iOS build exists. Students keep using the mobile app; the backend refuses student accounts here.
 
+It follows the mobile app's faculty screens, currently v1.2.0.
+
 Same backend (Render) and database (Neon) as the mobile app.
 
 ## What it does
 
 - Sign in (faculty only), reset password
-- Subjects: create, delete, filter by theory or practical
+- Subjects: create, edit, duplicate, share the join code and delete (the warning says how many lectures, records and students go with it)
+- Academic year and Odd/Even semester on every subject; search and filters by type, year and semester; the list opens on the running year and semester
 - Start attendance: full-screen code, countdown and live present count; the screen stays on while the code is showing
 - Lecture summary after each session, with tap-to-correct statuses
-- Per subject: students with attendance %, enrollment requests, past lectures
-- Reports: recent classes and Excel downloads by date range
-- Profile: change password, sign out, delete account
+- Per subject: students with attendance %, enrollment requests (with Approve all), leave requests (Approve, Reject with a note, Approve all, Take back), past lectures
+- Approved leave shows as Excused and is left out of attendance percentages
+- Reports: recent classes (search by subject or date, filters) and Excel downloads with quick date ranges
+- Profile: change password with a code emailed to the account, sign out, delete account (needs the password)
 - Faculty sign-up with an email code (any email address)
 
 Not on the web: student sign-up and moving an account to a new phone (app only).

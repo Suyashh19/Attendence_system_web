@@ -2,7 +2,8 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, LogOut, Trash2, ChevronRight, Briefcase, KeyRound, ShieldCheck, Share, PlusSquare, type LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { updateUserPassword, deleteAccount } from '../lib/auth';
+import { requestPasswordChange, confirmPasswordChange, deleteAccount } from '../lib/auth';
+import { maskEmail } from '../utils/maskEmail';
 import { getErrorMessage } from '../lib/api';
 import { Button, Card, Input, SectionLabel } from '../components/ui';
 import { Sheet } from '../components/Sheet';
@@ -17,11 +18,18 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
 
+  // Password change: a code is emailed to the account address first
   const [passwordOpen, setPasswordOpen] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
+  const [passwordOtp, setPasswordOtp] = useState('');
+  const [sendingCode, setSendingCode] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
+
+  // Deleting an account needs the account password
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   const handleLogout = async () => {
     const ok = await confirmDialog({ title: 'Sign Out', message: 'Are you sure you want to sign out?', confirmLabel: 'Sign Out', destructive: true });
@@ -30,18 +38,48 @@ export default function ProfilePage() {
     navigate('/login', { replace: true });
   };
 
+  // Asks first, then emails a code to the registered address. The user never types an email.
+  const handleStartPasswordChange = async () => {
+    const ok = await confirmDialog({
+      title: 'Change password?',
+      message: `We will email a 6-digit code to ${maskEmail(user?.email)} to confirm it is you.`,
+      confirmLabel: 'Send code',
+    });
+    if (ok) await sendPasswordCode(true);
+  };
+
+  const sendPasswordCode = async (openSheet: boolean) => {
+    try {
+      setSendingCode(true);
+      await requestPasswordChange();
+      setPasswordOtp('');
+      if (openSheet) {
+        setNewPassword('');
+        setConfirmPassword('');
+        setPasswordOpen(true);
+      } else {
+        toast(`A new code is on its way to ${maskEmail(user?.email)}.`);
+      }
+    } catch (err) {
+      toast(getErrorMessage(err, 'Could not send the code. Please try again.'), 'error');
+    } finally {
+      setSendingCode(false);
+    }
+  };
+
   const handleUpdatePassword = async (e: FormEvent) => {
     e.preventDefault();
-    if (!currentPassword || !newPassword || !confirmPassword) return toast('All fields are required.', 'error');
+    if (passwordOtp.trim().length !== 6) return toast('Enter the 6-digit code from your email.', 'error');
+    if (!newPassword || !confirmPassword) return toast('Enter and confirm your new password.', 'error');
     if (newPassword.length < 6) return toast('New password must be at least 6 characters.', 'error');
     if (newPassword !== confirmPassword) return toast('New passwords do not match.', 'error');
 
     try {
       setSavingPassword(true);
-      const res = await updateUserPassword({ currentPassword, newPassword });
+      const res = await confirmPasswordChange({ otp: passwordOtp.trim(), newPassword });
       toast(res.message || 'Password updated.');
       setPasswordOpen(false);
-      setCurrentPassword('');
+      setPasswordOtp('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err) {
@@ -51,21 +89,27 @@ export default function ProfilePage() {
     }
   };
 
-  const handleDeleteAccount = async () => {
-    const ok = await confirmDialog({
-      title: 'Delete account?',
-      message: 'This permanently deletes your account, your subjects and their attendance records. This cannot be undone.',
-      confirmLabel: 'Delete Permanently',
-      destructive: true,
-    });
-    if (!ok) return;
+  // Opens the password sheet: deleting needs the account password, not just a tap
+  const openDelete = () => {
+    setDeletePassword('');
+    setDeleteOpen(true);
+  };
+
+  const handleDeleteAccount = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!deletePassword) return toast('Enter your password to delete your account.', 'error');
     try {
-      await deleteAccount();
+      setDeleting(true);
+      await deleteAccount(deletePassword);
+      setDeleteOpen(false);
       logout();
       navigate('/login', { replace: true });
       toast('Your account has been deleted.');
     } catch (err) {
-      toast(getErrorMessage(err, 'Failed to delete the account.'), 'error');
+      toast(getErrorMessage(err, 'Could not delete the account.'), 'error');
+    } finally {
+      setDeleting(false);
+      setDeletePassword('');
     }
   };
 
@@ -109,30 +153,37 @@ export default function ProfilePage() {
 
         <SectionLabel className="mb-3 ml-1">ACCOUNT</SectionLabel>
         <Card className="overflow-hidden mb-6">
-          <SettingsRow icon={Lock} title="Update Password" subtitle="Change the password you sign in with" onClick={() => setPasswordOpen(true)} divider />
+          <SettingsRow icon={Lock} title="Update Password" subtitle="Change the password you sign in with" onClick={handleStartPasswordChange} divider />
           <SettingsRow icon={LogOut} title="Sign Out" subtitle="You will need to sign in again" onClick={handleLogout} />
         </Card>
 
         <p className="text-danger font-bold text-xs tracking-widest mb-3 ml-1">DANGER ZONE</p>
         <Card className="overflow-hidden border-danger/20">
-          <SettingsRow icon={Trash2} title="Delete Account" subtitle="Permanently removes your data" tone="danger" onClick={handleDeleteAccount} />
+          <SettingsRow icon={Trash2} title="Delete Account" subtitle="Permanently removes your data" tone="danger" onClick={openDelete} />
         </Card>
 
-        <p className="text-center text-light-subtle text-xs font-medium mt-8">Attendance System · Web v1.0.0</p>
+        <p className="text-center text-light-subtle text-xs font-medium mt-8">Attendance System · Web v1.2.0</p>
       </div>
 
-      <Sheet open={passwordOpen} onClose={() => setPasswordOpen(false)} title="Update Password" subtitle="Use at least 6 characters for the new password.">
+      <Sheet open={passwordOpen} onClose={() => setPasswordOpen(false)} title="Update Password" subtitle={`Enter the code we emailed to ${maskEmail(user?.email)}, then choose a new password.`}>
         <form onSubmit={handleUpdatePassword}>
-          <Input label="Current Password" type="password" autoComplete="current-password" icon={Lock} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+          <Input
+            label="6-digit code"
+            placeholder="123456"
+            icon={Mail}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            value={passwordOtp}
+            onChange={(e) => setPasswordOtp(e.target.value.replace(/\D/g, ''))}
+          />
           <button
             type="button"
-            onClick={() => {
-              setPasswordOpen(false);
-              navigate('/forgot-password');
-            }}
+            onClick={() => sendPasswordCode(false)}
+            disabled={sendingCode}
             className="block ml-auto -mt-2 mb-4 text-primary font-semibold text-xs"
           >
-            Forgot Password?
+            {sendingCode ? 'Sending...' : 'Resend code'}
           </button>
           <Input label="New Password" type="password" autoComplete="new-password" icon={KeyRound} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
           <Input
@@ -145,6 +196,28 @@ export default function ProfilePage() {
             error={confirmPassword && newPassword !== confirmPassword ? 'Passwords do not match' : undefined}
           />
           <Button title="Save Password" type="submit" loading={savingPassword} className="mt-2 w-full" />
+        </form>
+      </Sheet>
+
+      <Sheet
+        open={deleteOpen}
+        onClose={() => !deleting && setDeleteOpen(false)}
+        title="Delete Account"
+        subtitle="This permanently deletes your account, your subjects and their attendance records. It cannot be undone."
+      >
+        <form onSubmit={handleDeleteAccount}>
+          <Input
+            label="Enter your password to confirm"
+            type="password"
+            autoComplete="current-password"
+            icon={Lock}
+            value={deletePassword}
+            onChange={(e) => setDeletePassword(e.target.value)}
+          />
+          <div className="flex gap-3 mt-2">
+            <Button title="Cancel" variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting} className="flex-1" />
+            <Button title="Delete" type="submit" variant="danger" loading={deleting} disabled={!deletePassword} className="flex-1" />
+          </div>
         </form>
       </Sheet>
     </div>

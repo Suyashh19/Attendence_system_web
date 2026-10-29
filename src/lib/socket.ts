@@ -54,6 +54,12 @@ export function onSessionEnded(callback: (data: SessionEndedPayload) => void): (
   return () => socket?.off('session_ended', callback);
 }
 
+/** A leave request was sent or answered, so lists of requests are out of date. */
+export function onLeaveUpdated(callback: () => void): () => void {
+  socket?.on('leave_updated', callback);
+  return () => socket?.off('leave_updated', callback);
+}
+
 export function onAttendanceCount(callback: (data: AttendanceCountPayload) => void): () => void {
   socket?.on('attendance_count', callback);
   return () => socket?.off('attendance_count', callback);

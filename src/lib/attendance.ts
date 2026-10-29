@@ -8,6 +8,7 @@ import type {
   SubjectSession,
   FacultySession,
   SessionAttendance,
+  SubjectSummary,
 } from '../types';
 
 // ─── Subjects ─────────────────────────────────────────────────────────────────
@@ -16,9 +17,24 @@ export async function getMySubjects(): Promise<Subject[]> {
   return Array.isArray(data) ? data : (data.subjects ?? []);
 }
 
-export async function createSubject(name: string, code: string, type: 'theory' | 'practical'): Promise<Subject> {
-  const { data } = await api.post('/subjects', { name, code, type });
+export async function createSubject(name: string, code: string, type: 'theory' | 'practical', span?: string): Promise<Subject> {
+  const { data } = await api.post('/subjects', { name, code, type, span });
   return data.subject;
+}
+
+// Send only the fields that changed; an empty span clears the semester label
+export async function updateSubject(
+  subjectId: number,
+  changes: { name?: string; code?: string; type?: 'theory' | 'practical'; span?: string }
+): Promise<Subject> {
+  const { data } = await api.put(`/subjects/${subjectId}`, changes);
+  return data.subject;
+}
+
+// What a delete would remove: lectures, attendance records and students
+export async function getSubjectSummary(subjectId: number): Promise<SubjectSummary> {
+  const { data } = await api.get(`/subjects/${subjectId}/summary`);
+  return data;
 }
 
 export async function deleteSubject(subjectId: number): Promise<void> {
@@ -35,6 +51,12 @@ export async function getSubjectEnrollments(subjectId: number): Promise<Enrolled
 export async function updateEnrollmentStatus(subjectId: number, studentId: number, status: 'APPROVED' | 'REJECTED') {
   const { data } = await api.put(`/enrollments/subject/${subjectId}/student/${studentId}/status`, { status });
   return data;
+}
+
+// Approves every pending request for the subject; returns how many were approved
+export async function approveAllEnrollments(subjectId: number): Promise<number> {
+  const { data } = await api.put(`/enrollments/subject/${subjectId}/approve-all`);
+  return data.approved ?? 0;
 }
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
@@ -59,8 +81,9 @@ export async function getMyActiveSession(): Promise<{ active: boolean; session?:
   return data;
 }
 
-export async function getRecentSessions(): Promise<RecentSession[]> {
-  const { data } = await api.get('/sessions/recent');
+// Fetches up to 100 so Reports can search older classes; the list itself shows the newest 10
+export async function getRecentSessions(limit = 100): Promise<RecentSession[]> {
+  const { data } = await api.get('/sessions/recent', { params: { limit } });
   return data.sessions ?? [];
 }
 

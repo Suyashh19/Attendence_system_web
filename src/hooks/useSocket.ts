@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { joinSubjectRoom, leaveSubjectRoom, onSessionEnded, onAttendanceCount } from '../lib/socket';
+import { joinSubjectRoom, leaveSubjectRoom, onSessionEnded, onAttendanceCount, onLeaveUpdated } from '../lib/socket';
 import type { SessionEndedPayload, AttendanceCountPayload } from '../types';
 import { useAuthStore } from '../store/authStore';
 
@@ -7,6 +7,7 @@ interface UseSocketOptions {
   subjectIds?: string[];
   onSessionEnded?: (data: SessionEndedPayload) => void;
   onAttendanceCount?: (data: AttendanceCountPayload) => void;
+  onLeaveUpdated?: () => void;
 }
 
 export function useSocket(options: UseSocketOptions = {}): void {
@@ -23,6 +24,7 @@ export function useSocket(options: UseSocketOptions = {}): void {
     const cleanups = [
       onSessionEnded((data) => optionsRef.current.onSessionEnded?.(data)),
       onAttendanceCount((data) => optionsRef.current.onAttendanceCount?.(data)),
+      onLeaveUpdated(() => optionsRef.current.onLeaveUpdated?.()),
     ];
     return () => cleanups.forEach((fn) => fn());
   }, [isAuthenticated]);

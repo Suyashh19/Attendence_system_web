@@ -15,6 +15,10 @@ export function statusTone(status: string): { text: string; bg: string } {
     case 'ABSENT':
     case 'REJECTED':
       return { text: 'text-danger', bg: 'bg-danger-bg' };
+    case 'EXCUSED':
+      return { text: 'text-info', bg: 'bg-info-bg' };
+    case 'CANCELLED':
+      return { text: 'text-light-muted', bg: 'bg-light-border' };
     default:
       return { text: 'text-warning', bg: 'bg-warning-bg' };
   }

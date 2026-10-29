@@ -20,6 +20,8 @@ const c = {
   warningBg: '#FEF3E2',
   danger: '#D92D20',
   dangerBg: '#FEECEA',
+  info: '#1D4ED8',
+  infoBg: '#E8F0FE',
 };
 
 /** @type {import('tailwindcss').Config} */
@@ -35,6 +37,7 @@ export default {
         success: { DEFAULT: c.success, bg: c.successBg },
         warning: { DEFAULT: c.warning, bg: c.warningBg },
         danger: { DEFAULT: c.danger, bg: c.dangerBg },
+        info: { DEFAULT: c.info, bg: c.infoBg },
         light: {
           DEFAULT: c.bg,
           card: c.card,

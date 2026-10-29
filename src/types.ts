@@ -20,7 +20,17 @@ export interface Subject {
   code: string;
   facultyId: number;
   type: 'theory' | 'practical';
+  /** Academic year and semester, e.g. "2026-27 Odd" (optional) */
+  span?: string | null;
   _count?: { enrollments: number };
+}
+
+/** What deleting a subject would remove, shown in the delete confirmation */
+export interface SubjectSummary {
+  subjectId: number;
+  lectures: number;
+  records: number;
+  students: number;
 }
 
 /** A session the faculty started: the code to show and when the window closes */
@@ -45,7 +55,7 @@ export interface AttendanceCountPayload {
   presentCount: number;
 }
 
-export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'INVALID';
+export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'INVALID' | 'EXCUSED';
 
 /** One row of the roster returned when a session ends */
 export interface SessionAttendance {
@@ -102,6 +112,7 @@ export interface StudentAttendanceSummary {
   PRESENT: number;
   ABSENT: number;
   INVALID: number;
+  EXCUSED?: number;
   totalSessions: number;
   attendancePercentage: string;
 }
@@ -117,4 +128,23 @@ export interface SubjectSession {
   isActive: boolean;
   startTime: string;
   endTime: string | null;
+}
+
+// ─── Leave ────────────────────────────────────────────────────────────────────
+export type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+
+export interface LeaveRequest {
+  id: number;
+  studentId: number;
+  subjectId: number;
+  /** First and last day of the leave, "YYYY-MM-DD" */
+  fromDate: string;
+  toDate: string;
+  reason: string;
+  status: LeaveStatus;
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  /** Who asked */
+  student?: { id: number; name: string | null; rollNo: string | null; prn: string | null };
 }

@@ -1,18 +1,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Radio, BookOpen, FlaskConical, Users, Play, ChevronRight, School, CloudOff, RefreshCw, Loader2 } from 'lucide-react';
+import { Plus, Radio, BookOpen, FlaskConical, Users, Play, ChevronRight, School, CloudOff, RefreshCw, Loader2, SearchX, X } from 'lucide-react';
 import { getMySubjects, startSession, endSession, getMyActiveSession } from '../lib/attendance';
 import { getErrorMessage } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import { useSocket } from '../hooks/useSocket';
-import { Avatar, Button, Chip, EmptyState, SectionLabel, Spinner } from '../components/ui';
+import { Avatar, Button, EmptyState, SectionLabel } from '../components/ui';
 import { confirmDialog, toast } from '../components/Dialog';
 import { CreateSubjectSheet } from '../components/SubjectSheets';
+import { ClassFilterSheet } from '../components/ClassFilterSheet';
+import { SearchFilterBar } from '../components/SearchFilterBar';
+import { TabSkeleton } from '../components/Skeleton';
+import { offerToShareSubject } from '../lib/share';
+import {
+  NO_FILTERS,
+  activeFilterCount,
+  applyClassFilters,
+  buildClassList,
+  defaultFilters,
+  filterSummary,
+  filtersShowing,
+  yearChoices,
+  type ClassFilters,
+} from '../utils/classesView';
 import { FacultySessionScreen, AttendanceSummarySheet } from '../components/SessionModals';
 import type { FacultySession, SessionAttendance, Subject } from '../types';
-
-type Category = 'theory' | 'practical' | null;
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -26,7 +39,10 @@ export default function HomePage() {
   const [ending, setEnding] = useState(false);
   const endingRef = useRef(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [category, setCategory] = useState<Category>(null);
+  // null = not touched yet, so the list opens on the running academic year and term
+  const [chosenFilters, setChosenFilters] = useState<ClassFilters | null>(null);
+  const [search, setSearch] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
   // Bumped when the page comes back into view, to re-check for a running session
   const [visibleTick, setVisibleTick] = useState(0);
 
@@ -35,9 +51,18 @@ export default function HomePage() {
     queryFn: getMySubjects,
   });
 
-  const filtered = category ? subjects.filter((s) => s.type === category) : subjects;
   const subjectIds = useMemo(() => subjects.map((s) => String(s.id)), [subjects]);
   const liveSubject = activeSession ? subjects.find((s) => s.id === Number(activeSession.subjectId)) : undefined;
+
+  // A chosen year or term that no longer matches anything just shows an empty state with Show all
+  const filters = chosenFilters ?? defaultFilters(subjects);
+  const filterCount = activeFilterCount(filters);
+  const filtered = useMemo(() => applyClassFilters(subjects, filters, search), [subjects, filters, search]);
+  const listEntries = useMemo(() => buildClassList(filtered, liveSubject?.id ?? null), [filtered, liveSubject?.id]);
+  const showAll = () => {
+    setChosenFilters(NO_FILTERS);
+    setSearch('');
+  };
 
   // ─── Ending a session ───────────────────────────────────────────────────────
   // Also runs when the server closes the session by itself; the end call then just returns the roster
@@ -165,7 +190,7 @@ export default function HomePage() {
   };
 
   // ─── Render ─────────────────────────────────────────────────────────────────
-  if (isLoading) return <Spinner className="pt-40" />;
+  if (isLoading) return <TabSkeleton />;
 
   if (isError) {
     return (
@@ -186,11 +211,6 @@ export default function HomePage() {
     theory: subjects.filter((s) => s.type === 'theory').length,
     practical: subjects.filter((s) => s.type === 'practical').length,
   };
-  const categories: { key: Category; label: string; count: number }[] = [
-    { key: null, label: 'All', count: subjects.length },
-    { key: 'theory', label: 'Theory', count: counts.theory },
-    { key: 'practical', label: 'Practical', count: counts.practical },
-  ];
 
   return (
     <div>
@@ -249,47 +269,76 @@ export default function HomePage() {
       </header>
 
       {subjects.length > 0 && (
-        <div className="flex gap-2 px-4 mt-4 overflow-x-auto">
-          {categories.map(({ key, label, count }) => (
-            <Chip key={label} label={`${label} · ${count}`} selected={category === key} onClick={() => setCategory(key)} />
-          ))}
-        </div>
-      )}
-
-      {filtered.length > 0 ? (
-        <>
-          <SectionLabel className="px-5 mt-5 mb-3">YOUR SUBJECTS</SectionLabel>
-          <div className="px-4">
-            {filtered.map((subject) => (
-              <SubjectCard
-                key={subject.id}
-                subject={subject}
-                live={liveSubject?.id === subject.id}
-                onOpen={() => navigate(`/subject/${subject.id}`)}
-                onStart={() => handleStartPress(subject)}
-              />
-            ))}
-          </div>
-        </>
-      ) : (
-        <div className="px-4 pt-6">
-          <EmptyState
-            icon={School}
-            title={category ? `No ${category} subjects yet` : 'No subjects yet'}
-            text="Create a subject, then share its code with your students so they can enroll."
-            action={<Button title="Create Subject" icon={Plus} onClick={() => setShowCreate(true)} />}
+        <div className="px-4 mt-4">
+          <SearchFilterBar
+            value={search}
+            onChange={setSearch}
+            placeholder="Search by name or code"
+            filterCount={filterCount}
+            onOpenFilters={() => setShowFilters(true)}
+            summary={filterSummary(filtered.length, filters)}
+            onShowAll={showAll}
           />
         </div>
       )}
 
+      {subjects.length === 0 ? (
+        <div className="px-4 pt-6">
+          <EmptyState
+            icon={School}
+            title="No subjects yet"
+            text="Create a subject, then share its code with your students so they can enroll."
+            action={<Button title="Create Subject" icon={Plus} onClick={() => setShowCreate(true)} />}
+          />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="px-4">
+          <EmptyState
+            icon={SearchX}
+            title="No subjects match"
+            text={search.trim() ? `Nothing found for "${search.trim()}" with these filters.` : 'No subjects fit the filters you picked.'}
+            action={<Button title="Clear filters" variant="outline" icon={X} onClick={showAll} />}
+          />
+        </div>
+      ) : (
+        <div className="px-4">
+          {listEntries.map((entry) =>
+            entry.kind === 'header' ? (
+              <SectionLabel key={`header-${entry.key}`} className="px-1 mt-4 mb-3">
+                {entry.label.toUpperCase()} · {entry.count}
+              </SectionLabel>
+            ) : (
+              <SubjectCard
+                key={entry.subject.id}
+                subject={entry.subject}
+                live={liveSubject?.id === entry.subject.id}
+                onOpen={() => navigate(`/subject/${entry.subject.id}`)}
+                onStart={() => handleStartPress(entry.subject)}
+              />
+            )
+          )}
+        </div>
+      )}
+
+      <ClassFilterSheet
+        open={showFilters}
+        onClose={() => setShowFilters(false)}
+        filters={filters}
+        onChange={setChosenFilters}
+        years={yearChoices(subjects)}
+        counts={{ all: subjects.length, theory: counts.theory, practical: counts.practical }}
+      />
+
       <CreateSubjectSheet
         open={showCreate}
         onClose={() => setShowCreate(false)}
-        onSuccess={(type) => {
+        onSuccess={(_type, created) => {
           setShowCreate(false);
-          setCategory(type);
+          // Show the new subject: filter to its year and term, and drop a search that would hide it
+          setChosenFilters(filtersShowing(created.span));
+          setSearch('');
           queryClient.invalidateQueries({ queryKey: ['subjects'] });
-          toast('Subject created');
+          void offerToShareSubject(created);
         }}
       />
 
@@ -323,6 +372,11 @@ export default function HomePage() {
   );
 }
 
+/** "Theory · 2026-27 Odd": the type and the semester label, when there is one. */
+function subjectMeta(subject: Subject): string {
+  return [subject.type === 'practical' ? 'Practical' : 'Theory', subject.span].filter(Boolean).join(' · ');
+}
+
 function SubjectCard({ subject, live, onOpen, onStart }: { subject: Subject; live: boolean; onOpen: () => void; onStart: () => void }) {
   const practical = subject.type === 'practical';
   return (
@@ -338,8 +392,8 @@ function SubjectCard({ subject, live, onOpen, onStart }: { subject: Subject; liv
         <span className="flex-1 min-w-0 mr-2">
           <span className="block text-light-text font-bold text-base truncate">{subject.name}</span>
           <span className="flex items-center mt-1">
-            <span className="bg-light px-2 py-0.5 rounded-md mr-2 text-light-muted text-[11px] font-bold tracking-wide">{subject.code}</span>
-            <span className="text-light-muted text-xs font-medium">{practical ? 'Practical' : 'Theory'}</span>
+            <span className="bg-light px-2 py-0.5 rounded-md mr-2 text-light-muted text-[11px] font-bold tracking-wide shrink-0">{subject.code}</span>
+            <span className="text-light-muted text-xs font-medium truncate">{subjectMeta(subject)}</span>
           </span>
         </span>
         {live && (

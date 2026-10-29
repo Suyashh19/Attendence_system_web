@@ -1,67 +1,157 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { School, Tag, BookOpen, FlaskConical, Download, FileText, CheckCircle2 } from 'lucide-react';
 import { Sheet } from './Sheet';
-import { Button, Input, SegmentedControl } from './ui';
+import { Button, Chip, Input, SegmentedControl } from './ui';
 import { toast } from './Dialog';
-import { createSubject } from '../lib/attendance';
+import { createSubject, updateSubject } from '../lib/attendance';
 import { getErrorMessage } from '../lib/api';
+import { academicYearOptions, currentAcademicYear, currentTerm, formatSpan, parseSpan, type Term } from '../utils/academicYear';
+import { subjectSubtitle } from '../utils/subjectText';
+import { RANGE_PRESETS, presetRange, type RangeKey } from '../utils/exportRange';
 import type { Subject } from '../types';
+
+type SubjectType = 'theory' | 'practical';
 
 const TYPES = [
   { key: 'theory' as const, label: 'Theory', icon: BookOpen },
   { key: 'practical' as const, label: 'Practical', icon: FlaskConical },
 ];
 
+const TERM_OPTIONS = [
+  { key: 'Odd' as const, label: 'Odd semester' },
+  { key: 'Even' as const, label: 'Even semester' },
+];
+
 interface CreateSubjectSheetProps {
   open: boolean;
   onClose: () => void;
-  onSuccess: (type: 'theory' | 'practical') => void;
+  /** Called with the saved subject, so the caller can offer to share its code */
+  onSuccess: (type: SubjectType, saved: Subject) => void;
+  /** Edit this subject instead of creating a new one */
+  subject?: Subject;
+  /** Start a new subject from another one's details (Duplicate). The code is left blank: it must be new. */
+  prefill?: { name: string; type: SubjectType; span?: string | null };
 }
 
-export function CreateSubjectSheet({ open, onClose, onSuccess }: CreateSubjectSheetProps) {
-  const [name, setName] = useState('');
-  const [code, setCode] = useState('');
-  const [type, setType] = useState<'theory' | 'practical'>('theory');
+/** Year + term from a saved label. An old free-text label gives no year, so the faculty picks one. */
+function splitSpan(span?: string | null): { year: string; term: Term } {
+  const parsed = parseSpan(span);
+  return { year: parsed?.year ?? '', term: parsed?.term ?? currentTerm() };
+}
+
+function initialValues(subject?: Subject, prefill?: CreateSubjectSheetProps['prefill']) {
+  if (subject) return { name: subject.name, code: subject.code, type: subject.type as SubjectType, ...splitSpan(subject.span) };
+  if (prefill) return { name: prefill.name, code: '', type: prefill.type, ...splitSpan(prefill.span) };
+  // A new subject starts on the running academic year and term
+  return { name: '', code: '', type: 'theory' as SubjectType, year: currentAcademicYear(), term: currentTerm() };
+}
+
+export function CreateSubjectSheet({ open, onClose, onSuccess, subject, prefill }: CreateSubjectSheetProps) {
+  const editing = !!subject;
+  const [values, setValues] = useState(() => initialValues(subject, prefill));
   const [loading, setLoading] = useState(false);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  // The saved year is always offered, even when it has fallen out of the usual range
+  const yearOptions = useMemo(() => {
+    const options = academicYearOptions();
+    return values.year && !options.includes(values.year) ? [...options, values.year] : options;
+  }, [values.year]);
+
+  // Each time the sheet opens it starts from the subject being edited, the duplicate, or blank
+  useEffect(() => {
+    if (open) setValues(initialValues(subject, prefill));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !code.trim()) {
+    const name = values.name.trim();
+    const code = values.code.trim();
+
+    if (!name || !code) {
       toast('Enter both a subject name and a subject code.', 'error');
       return;
     }
+
+    const span = values.year ? formatSpan(values.year, values.term) : '';
+
     try {
       setLoading(true);
-      await createSubject(name.trim(), code.trim(), type);
-      onSuccess(type);
-      setName('');
-      setCode('');
-      setType('theory');
+      let saved: Subject;
+
+      if (subject) {
+        // Send only what changed
+        const changes: { name?: string; code?: string; type?: SubjectType; span?: string } = {};
+        if (name !== subject.name) changes.name = name;
+        if (code.toUpperCase() !== subject.code) changes.code = code;
+        if (values.type !== subject.type) changes.type = values.type;
+        // An old free-text label stays as it is until a year is picked to replace it
+        const keepsOldLabel = !!subject.span && !parseSpan(subject.span) && !values.year;
+        if (!keepsOldLabel && span !== (subject.span ?? '')) changes.span = span;
+
+        if (Object.keys(changes).length === 0) {
+          onClose();
+          return;
+        }
+        saved = await updateSubject(subject.id, changes);
+      } else {
+        saved = await createSubject(name, code, values.type, span || undefined);
+      }
+
+      onSuccess(values.type, saved);
     } catch (err) {
-      toast(getErrorMessage(err, 'Could not create the subject. Please try again.'), 'error');
+      toast(getErrorMessage(err, editing ? 'Could not save the changes. Please try again.' : 'Could not create the subject. Please try again.'), 'error');
     } finally {
       setLoading(false);
     }
   };
 
+  const title = editing ? 'Edit subject' : prefill ? 'Duplicate subject' : 'New subject';
+  const subtitle = editing
+    ? 'Students already in the class stay enrolled.'
+    : prefill
+      ? 'Give the copy a new code and check its academic year. It starts with no students.'
+      : 'Students enroll with the subject code you set here.';
+
   return (
-    <Sheet open={open} onClose={onClose} title="New subject" subtitle="Students enroll with the subject code you set here.">
-      <form onSubmit={handleCreate}>
-        <Input label="Subject name" placeholder="e.g. Distributed Systems" icon={School} value={name} onChange={(e) => setName(e.target.value)} />
+    <Sheet open={open} onClose={onClose} title={title} subtitle={subtitle}>
+      <form onSubmit={handleSave}>
+        <Input label="Subject name" placeholder="e.g. Distributed Systems" icon={School} value={values.name} onChange={(e) => setValues({ ...values, name: e.target.value })} />
         <Input
           label="Subject code"
           placeholder="e.g. CS402"
           icon={Tag}
-          value={code}
-          onChange={(e) => setCode(e.target.value.toUpperCase())}
+          value={values.code}
+          onChange={(e) => setValues({ ...values, code: e.target.value.toUpperCase() })}
           autoCapitalize="characters"
           autoCorrect="off"
         />
+
+        <p className="text-light-text font-semibold mb-2 ml-1 text-[13px]">Academic year (optional)</p>
+        <div className="flex gap-2 overflow-x-auto -mx-6 px-6 pb-1 mb-4">
+          {yearOptions.map((year) => (
+            <Chip
+              key={year}
+              label={year === currentAcademicYear() ? `${year} · Current` : year}
+              selected={values.year === year}
+              // Tapping the chosen year again clears it
+              onClick={() => setValues({ ...values, year: values.year === year ? '' : year })}
+            />
+          ))}
+        </div>
+        {values.year && <SegmentedControl options={TERM_OPTIONS} value={values.term} onChange={(term) => setValues({ ...values, term })} className="mb-4" />}
+        {subject?.span && !parseSpan(subject.span) && !values.year && (
+          <p className="text-light-muted text-xs font-medium -mt-1 mb-4 ml-1">Current label: {subject.span}. Pick an academic year to replace it.</p>
+        )}
+        {editing && values.code.trim().toUpperCase() !== subject!.code && (
+          <p className="text-light-muted text-xs font-medium mb-4 ml-1">Students who join later must use the new code. Share it with them.</p>
+        )}
+
         <p className="text-light-text font-semibold mb-2 ml-1 text-[13px]">Type</p>
-        <SegmentedControl options={TYPES} value={type} onChange={setType} className="mb-6" />
+        <SegmentedControl options={TYPES} value={values.type} onChange={(type) => setValues({ ...values, type })} className="mb-6" />
         <div className="flex gap-3">
           <Button title="Cancel" variant="outline" onClick={onClose} disabled={loading} className="flex-1" />
-          <Button title="Create" type="submit" loading={loading} className="flex-1" />
+          <Button title={editing ? 'Save' : 'Create'} type="submit" loading={loading} className="flex-1" />
         </div>
       </form>
     </Sheet>
@@ -85,13 +175,24 @@ interface ExportSheetProps {
 
 export function ExportSheet({ open, onClose, subjects, initialSubjectId, loading, onConfirm }: ExportSheetProps) {
   const [subjectId, setSubjectId] = useState<number | undefined>(initialSubjectId);
-  const [start, setStart] = useState(() => toInputDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))); // last 30 days
-  const [end, setEnd] = useState(() => toInputDate(new Date()));
+  const [rangeKey, setRangeKey] = useState<RangeKey>('30d');
+  const [start, setStart] = useState(() => toInputDate(presetRange('30d').from));
+  const [end, setEnd] = useState(() => toInputDate(presetRange('30d').to));
 
-  // Each time the sheet opens, start on the subject whose download button was tapped
+  const pickPreset = (key: Exclude<RangeKey, 'custom'>) => {
+    const { from, to } = presetRange(key);
+    setRangeKey(key);
+    setStart(toInputDate(from));
+    setEnd(toInputDate(to));
+  };
+
+  // Each time the sheet opens, start on the subject whose download button was tapped, and the last 30 days
   useEffect(() => {
-    if (open) setSubjectId(initialSubjectId ?? subjects[0]?.id);
-  }, [open, initialSubjectId, subjects]);
+    if (!open) return;
+    setSubjectId(initialSubjectId ?? subjects[0]?.id);
+    pickPreset('30d');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialSubjectId]);
 
   const selected = subjects.find((s) => s.id === subjectId);
 
@@ -111,13 +212,8 @@ export function ExportSheet({ open, onClose, subjects, initialSubjectId, loading
   };
 
   return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      title="Export Attendance"
-      subtitle={selected ? selected.name : 'Choose a subject and a date range.'}
-    >
-      <p className="text-light-muted font-bold text-xs tracking-widest mb-3">SELECT SUBJECT</p>
+    <Sheet open={open} onClose={onClose} title="Download report" subtitle={selected ? subjectSubtitle(selected) : "An Excel sheet of every student's status for each lecture."}>
+      <p className="text-light-muted font-bold text-xs tracking-widest mb-3">SUBJECT</p>
       <div className="flex gap-2 overflow-x-auto -mx-6 px-6 pb-1 mb-6">
         {subjects.map((s) => {
           const isSelected = s.id === subjectId;
@@ -139,9 +235,30 @@ export function ExportSheet({ open, onClose, subjects, initialSubjectId, loading
       </div>
 
       <p className="text-light-muted font-bold text-xs tracking-widest mb-3">DATE RANGE</p>
+      <div className="flex gap-2 overflow-x-auto -mx-6 px-6 pb-1 mb-3">
+        {RANGE_PRESETS.map(({ key, label }) => (
+          <Chip key={key} label={label} selected={rangeKey === key} onClick={() => pickPreset(key)} />
+        ))}
+      </div>
       <div className="flex gap-3 mb-6">
-        <DateField label="FROM" value={start} onChange={setStart} max={end} />
-        <DateField label="TO" value={end} onChange={setEnd} min={start} />
+        <DateField
+          label="FROM"
+          value={start}
+          onChange={(v) => {
+            setStart(v);
+            setRangeKey('custom');
+          }}
+          max={end}
+        />
+        <DateField
+          label="TO"
+          value={end}
+          onChange={(v) => {
+            setEnd(v);
+            setRangeKey('custom');
+          }}
+          min={start}
+        />
       </div>
 
       <div className="bg-light-primaryBg p-4 rounded-2xl flex">
@@ -156,7 +273,7 @@ export function ExportSheet({ open, onClose, subjects, initialSubjectId, loading
         </div>
       </div>
 
-      <Button title="Download Excel" icon={Download} onClick={handleConfirm} loading={loading} className="mt-6 w-full" />
+      <Button title="Download Excel" icon={Download} onClick={handleConfirm} loading={loading} disabled={!selected} className="mt-6 w-full" />
     </Sheet>
   );
 }
@@ -175,7 +292,7 @@ function DateField({
   max?: string;
 }) {
   return (
-    <label className="flex-1 bg-light p-4 rounded-2xl border border-light-border">
+    <label className="flex-1 min-w-0 bg-light p-4 rounded-2xl border border-light-border">
       <span className="block text-light-muted text-[10px] font-bold tracking-widest mb-1.5">{label}</span>
       <input
         type="date"

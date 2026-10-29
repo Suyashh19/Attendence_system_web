@@ -19,6 +19,10 @@ import {
   CloudOff,
   Calendar,
   Users,
+  Pencil,
+  Share2,
+  Copy,
+  CheckCheck,
 } from 'lucide-react';
 import {
   getMySubjects,
@@ -26,16 +30,25 @@ import {
   getSubjectAnalytics,
   getSubjectSessions,
   updateEnrollmentStatus,
+  approveAllEnrollments,
+  getSubjectSummary,
   deleteSubject,
 } from '../lib/attendance';
+import { approveAllLeaves, getSubjectLeaves, reviewLeave } from '../lib/leaves';
+import { shareSubjectCode, offerToShareSubject } from '../lib/share';
+import { deleteWarning, subjectSubtitle } from '../utils/subjectText';
+import { formatLeaveRange, leaveDays } from '../utils/leaveForm';
 import { getErrorMessage } from '../lib/api';
 import { MIN_ATTENDANCE_PERCENT } from '../theme';
-import type { Subject, EnrolledStudent, StudentAttendanceSummary, SubjectSession } from '../types';
+import type { Subject, EnrolledStudent, LeaveRequest, StudentAttendanceSummary, SubjectSession } from '../types';
 import { ScreenHeader } from '../components/Layout';
-import { Avatar, Button, Card, Chip, EmptyState, ProgressRing, SectionLabel, SegmentedControl, Spinner } from '../components/ui';
+import { Avatar, Button, Card, Chip, EmptyState, ProgressRing, SectionLabel, SegmentedControl, StatusPill } from '../components/ui';
+import { ListSkeleton } from '../components/Skeleton';
 import { confirmDialog, toast } from '../components/Dialog';
+import { CreateSubjectSheet } from '../components/SubjectSheets';
+import { LeaveRejectSheet } from '../components/LeaveRejectSheet';
 
-type Tab = 'students' | 'requests' | 'lectures';
+type Tab = 'students' | 'requests' | 'leaves' | 'lectures';
 
 /** Faculty's page for one subject: who is enrolled, who is waiting, and past lectures. */
 export default function SubjectPage() {
@@ -48,7 +61,7 @@ export default function SubjectPage() {
     return (
       <div>
         <ScreenHeader title="Subject" back />
-        {isLoading ? <Spinner className="pt-20" /> : <EmptyState icon={AlertCircle} text="This subject is no longer available." />}
+        {isLoading ? <ListSkeleton count={3} className="p-4 pt-6" /> : <EmptyState icon={AlertCircle} text="This subject is no longer available." />}
       </div>
     );
   }
@@ -65,6 +78,9 @@ function SubjectView({ subject }: { subject: Subject }) {
   const [onlyLow, setOnlyLow] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [showDuplicate, setShowDuplicate] = useState(false);
+  const [rejecting, setRejecting] = useState<LeaveRequest | null>(null);
 
   const enrollments = useQuery({ queryKey: ['enrollments', subjectId], queryFn: () => getSubjectEnrollments(subjectId) });
   const analytics = useQuery({ queryKey: ['subject-analytics', subjectId], queryFn: () => getSubjectAnalytics(subjectId) });
@@ -73,6 +89,12 @@ function SubjectView({ subject }: { subject: Subject }) {
     queryFn: () => getSubjectSessions(subjectId),
     enabled: tab === 'lectures',
   });
+
+  // Always loaded, so the tab can show how many leave requests are waiting
+  const leaves = useQuery({ queryKey: ['subject-leaves', subjectId], queryFn: () => getSubjectLeaves(subjectId) });
+  const leaveList = leaves.data?.leaves ?? [];
+  const pendingLeaves = useMemo(() => leaveList.filter((l) => l.status === 'PENDING'), [leaveList]);
+  const answeredLeaves = useMemo(() => leaveList.filter((l) => l.status !== 'PENDING'), [leaveList]);
 
   const students = enrollments.data ?? [];
   const approved = useMemo(() => students.filter((s) => s.status === 'APPROVED'), [students]);
@@ -108,6 +130,89 @@ function SubjectView({ subject }: { subject: Subject }) {
     onError: (err) => toast(getErrorMessage(err, 'Could not update. Please try again.'), 'error'),
   });
 
+  const { mutate: approveAll, isPending: isApprovingAll } = useMutation({
+    mutationFn: () => approveAllEnrollments(subjectId),
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['enrollments', subjectId] });
+      queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      toast(`${count} ${count === 1 ? 'student was' : 'students were'} added to the class.`);
+    },
+    onError: (err) => toast(getErrorMessage(err, 'Could not approve. Please try again.'), 'error'),
+  });
+
+  const confirmApproveAll = async () => {
+    const ok = await confirmDialog({
+      title: 'Approve all requests',
+      message: `Add all ${pending.length} waiting ${pending.length === 1 ? 'student' : 'students'} to ${subject.name}? Students you removed earlier are not affected.`,
+      confirmLabel: 'Approve all',
+    });
+    if (ok) approveAll();
+  };
+
+  // ── Leave requests ──────────────────────────────────────────────────────
+  const refreshAfterLeave = () => {
+    queryClient.invalidateQueries({ queryKey: ['subject-leaves', subjectId] });
+    queryClient.invalidateQueries({ queryKey: ['subject-analytics', subjectId] });
+    queryClient.invalidateQueries({ queryKey: ['session-details'] });
+  };
+
+  type LeaveData = { leaves: LeaveRequest[]; pending: number };
+
+  // The request changes status at once; it goes back if the server refuses
+  const { mutate: review } = useMutation({
+    mutationKey: ['review-leave'],
+    mutationFn: ({ id, status, note }: { id: number; status: 'APPROVED' | 'REJECTED'; note?: string }) => reviewLeave(id, status, note),
+    onMutate: async ({ id, status, note }) => {
+      await queryClient.cancelQueries({ queryKey: ['subject-leaves', subjectId] });
+      const previous = queryClient.getQueryData<LeaveData>(['subject-leaves', subjectId]);
+      queryClient.setQueryData<LeaveData>(['subject-leaves', subjectId], (old) => {
+        if (!old) return old;
+        const next = old.leaves.map((l) => (l.id === id ? { ...l, status, reviewNote: note || null } : l));
+        return { leaves: next, pending: next.filter((l) => l.status === 'PENDING').length };
+      });
+      return { previous };
+    },
+    onError: (err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(['subject-leaves', subjectId], context.previous);
+      toast(getErrorMessage(err, 'Could not update. Please try again.'), 'error');
+    },
+    onSettled: () => {
+      // Refetch once the last pending change has landed, so an older answer cannot undo a newer tap
+      if (queryClient.isMutating({ mutationKey: ['review-leave'] }) <= 1) refreshAfterLeave();
+    },
+  });
+
+  const { mutate: approveAllLeaveRequests, isPending: isApprovingAllLeaves } = useMutation({
+    mutationFn: () => approveAllLeaves(subjectId),
+    onSuccess: ({ approved: count, excused }) => {
+      refreshAfterLeave();
+      toast(
+        `${count} ${count === 1 ? 'request was' : 'requests were'} approved.` +
+          (excused > 0 ? ` ${excused} missed ${excused === 1 ? 'class was' : 'classes were'} excused.` : '')
+      );
+    },
+    onError: (err) => toast(getErrorMessage(err, 'Could not approve. Please try again.'), 'error'),
+  });
+
+  const confirmApproveAllLeaves = async () => {
+    const ok = await confirmDialog({
+      title: 'Approve all leave requests',
+      message: `Approve all ${pendingLeaves.length} waiting requests for ${subject.name}? Each student's missed classes in those days will be excused.`,
+      confirmLabel: 'Approve all',
+    });
+    if (ok) approveAllLeaveRequests();
+  };
+
+  const confirmRevoke = async (leave: LeaveRequest) => {
+    const ok = await confirmDialog({
+      title: 'Take back approval',
+      message: `${leave.student?.name || 'This student'}'s missed classes in those days will count as absences again.`,
+      confirmLabel: 'Take back',
+      destructive: true,
+    });
+    if (ok) review({ id: leave.id, status: 'REJECTED' });
+  };
+
   const confirmRemove = async (student: EnrolledStudent) => {
     const ok = await confirmDialog({
       title: 'Remove from class',
@@ -121,9 +226,15 @@ function SubjectView({ subject }: { subject: Subject }) {
   };
 
   const confirmDelete = async () => {
+    // Ask the server what a delete would remove, so the warning has real numbers.
+    // If that fails the generic warning is shown; the delete itself is never blocked.
+    setDeleting(true);
+    const summary = await getSubjectSummary(subjectId).catch(() => null);
+    setDeleting(false);
+
     const ok = await confirmDialog({
       title: 'Delete Subject',
-      message: `Are you sure you want to delete "${subject.name}"? This permanently wipes all attendance data for this class.\n\nIf you want to keep a record, download the Excel file from Reports first.`,
+      message: deleteWarning(subject.name, summary),
       confirmLabel: 'Delete Subject',
       destructive: true,
     });
@@ -156,8 +267,8 @@ function SubjectView({ subject }: { subject: Subject }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [approved, search, onlyLow, summaryByStudent]);
 
-  const isLoading = tab === 'lectures' ? sessions.isLoading : enrollments.isLoading;
-  const loadFailed = tab === 'lectures' ? sessions.isError : enrollments.isError;
+  const isLoading = tab === 'lectures' ? sessions.isLoading : tab === 'leaves' ? leaves.isLoading : enrollments.isLoading;
+  const loadFailed = tab === 'lectures' ? sessions.isError : tab === 'leaves' ? leaves.isError : enrollments.isError;
 
   const emptyText =
     tab === 'students'
@@ -166,31 +277,32 @@ function SubjectView({ subject }: { subject: Subject }) {
         : `No students yet. Share the code ${subject.code} so they can enroll, then approve them under Requests.`
       : tab === 'requests'
         ? 'No requests waiting for you.'
-        : 'No lectures yet. Start attendance from the Classes tab.';
+        : tab === 'leaves'
+          ? 'No leave requests. When a student applies, it appears here.'
+          : 'No lectures yet. Start attendance from the Classes tab.';
 
   const isEmpty =
     tab === 'students'
       ? filteredStudents.length === 0
       : tab === 'requests'
         ? pending.length === 0 && removed.length === 0
-        : (sessions.data ?? []).length === 0;
+        : tab === 'leaves'
+          ? leaveList.length === 0
+          : (sessions.data ?? []).length === 0;
 
   return (
     <div>
       <ScreenHeader
         title={subject.name}
-        subtitle={`${subject.code} · ${subject.type === 'practical' ? 'Practical' : 'Theory'}`}
+        subtitle={subjectSubtitle(subject)}
         back
         right={
-          <button
-            type="button"
-            onClick={confirmDelete}
-            disabled={deleting}
-            aria-label="Delete subject"
-            className="w-11 h-11 bg-white/10 border border-white/15 rounded-full flex items-center justify-center ml-3 shrink-0"
-          >
-            {deleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
-          </button>
+          <div className="flex ml-3 shrink-0">
+            <HeaderButton icon={Pencil} label="Edit subject" onClick={() => setShowEdit(true)} />
+            <HeaderButton icon={Share2} label="Share subject code" onClick={() => void shareSubjectCode(subject)} />
+            <HeaderButton icon={Copy} label="Duplicate subject" onClick={() => setShowDuplicate(true)} />
+            <HeaderButton icon={Trash2} label="Delete subject" onClick={confirmDelete} busy={deleting} />
+          </div>
         }
       >
         <div className="flex gap-2 mt-5">
@@ -205,12 +317,21 @@ function SubjectView({ subject }: { subject: Subject }) {
           options={[
             { key: 'students', label: 'Students' },
             { key: 'requests', label: 'Requests', badge: pending.length },
+            { key: 'leaves', label: 'Leave', badge: pendingLeaves.length },
             { key: 'lectures', label: 'Lectures' },
           ]}
           value={tab}
           onChange={setTab}
           className="mb-4"
         />
+
+        {tab === 'requests' && pending.length > 1 && (
+          <Button title={`Approve all (${pending.length})`} icon={CheckCheck} onClick={confirmApproveAll} loading={isApprovingAll} disabled={isUpdating} className="w-full mb-4" />
+        )}
+
+        {tab === 'leaves' && pendingLeaves.length > 1 && (
+          <Button title={`Approve all (${pendingLeaves.length})`} icon={CheckCheck} onClick={confirmApproveAllLeaves} loading={isApprovingAllLeaves} className="w-full mb-4" />
+        )}
 
         {tab === 'students' && approved.length > 0 && (
           <div className="mb-4">
@@ -241,11 +362,11 @@ function SubjectView({ subject }: { subject: Subject }) {
         )}
 
         {isLoading ? (
-          <Spinner className="pt-8" />
+          <ListSkeleton count={3} className="pt-2" />
         ) : loadFailed ? (
           <EmptyState icon={CloudOff} tone="danger" text="Could not load this. Check your connection and try again." />
         ) : isEmpty ? (
-          <EmptyState icon={tab === 'lectures' ? Calendar : Users} text={emptyText} />
+          <EmptyState icon={tab === 'lectures' || tab === 'leaves' ? Calendar : Users} text={emptyText} />
         ) : tab === 'students' ? (
           filteredStudents.map((student) => (
             <StudentRow
@@ -281,13 +402,71 @@ function SubjectView({ subject }: { subject: Subject }) {
               />
             ))}
           </>
+        ) : tab === 'leaves' ? (
+          <>
+            {pendingLeaves.map((leave) => (
+              <LeaveRow key={leave.id} leave={leave} onApprove={() => review({ id: leave.id, status: 'APPROVED' })} onReject={() => setRejecting(leave)} onRevoke={() => confirmRevoke(leave)} />
+            ))}
+            {answeredLeaves.length > 0 && <SectionLabel className="mt-3 mb-3 ml-1">ANSWERED</SectionLabel>}
+            {answeredLeaves.map((leave) => (
+              <LeaveRow key={leave.id} leave={leave} onApprove={() => review({ id: leave.id, status: 'APPROVED' })} onReject={() => setRejecting(leave)} onRevoke={() => confirmRevoke(leave)} />
+            ))}
+          </>
         ) : (
           (sessions.data ?? []).map((session) => (
             <LectureRow key={session.id} session={session} onOpen={() => navigate(`/lecture/${session.id}`)} />
           ))
         )}
       </div>
+
+      <LeaveRejectSheet
+        open={!!rejecting}
+        studentName={rejecting?.student?.name || 'The student'}
+        onClose={() => setRejecting(null)}
+        onConfirm={(note) => {
+          if (rejecting) review({ id: rejecting.id, status: 'REJECTED', note });
+          setRejecting(null);
+        }}
+      />
+
+      <CreateSubjectSheet
+        open={showEdit}
+        subject={subject}
+        onClose={() => setShowEdit(false)}
+        onSuccess={() => {
+          setShowEdit(false);
+          queryClient.invalidateQueries({ queryKey: ['subjects'] });
+          queryClient.invalidateQueries({ queryKey: ['recent-sessions'] });
+          toast('Changes saved');
+        }}
+      />
+
+      <CreateSubjectSheet
+        open={showDuplicate}
+        prefill={{ name: subject.name, type: subject.type, span: subject.span }}
+        onClose={() => setShowDuplicate(false)}
+        onSuccess={(_type, created) => {
+          setShowDuplicate(false);
+          queryClient.invalidateQueries({ queryKey: ['subjects'] });
+          void offerToShareSubject(created, 'Copy created');
+        }}
+      />
     </div>
+  );
+}
+
+/** A round icon button in the page header. */
+function HeaderButton({ icon: Icon, label, onClick, busy }: { icon: typeof Pencil; label: string; onClick: () => void; busy?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      aria-label={label}
+      className="w-10 h-10 bg-white/10 border border-white/15 rounded-full flex items-center justify-center ml-2"
+    >
+      {busy ? <Loader2 size={17} className="animate-spin" /> : <Icon size={17} />}
+    </button>
   );
 }
 
@@ -354,6 +533,7 @@ function StudentRow({
             <Count label="Present" value={summary?.PRESENT ?? 0} tone="bg-success-bg text-success" />
             <Count label="Absent" value={summary?.ABSENT ?? 0} tone="bg-danger-bg text-danger" />
             <Count label="Invalid" value={summary?.INVALID ?? 0} tone="bg-warning-bg text-warning" />
+            {!!summary?.EXCUSED && <Count label="Excused" value={summary.EXCUSED} tone="bg-info-bg text-info" />}
           </div>
           <Button title="Remove from class" variant="dangerSoft" size="sm" icon={UserMinus} onClick={onRemove} disabled={disabled} className="w-full" />
         </div>
@@ -408,6 +588,61 @@ function RequestRow({
         <Check size={20} />
         {removed && <span className="ml-1">Add back</span>}
       </button>
+    </Card>
+  );
+}
+
+function LeaveRow({
+  leave,
+  onApprove,
+  onReject,
+  onRevoke,
+}: {
+  leave: LeaveRequest;
+  onApprove: () => void;
+  onReject: () => void;
+  onRevoke: () => void;
+}) {
+  const days = leaveDays(leave.fromDate, leave.toDate);
+  const waiting = leave.status === 'PENDING';
+
+  return (
+    <Card className="mb-3 p-4">
+      <div className="flex items-center">
+        <Avatar name={leave.student?.name} size={46} />
+        <div className="flex-1 min-w-0 mx-3">
+          <p className="text-light-text font-bold text-[15px] truncate">{leave.student?.name || 'Unnamed student'}</p>
+          <p className="text-light-muted text-xs font-medium mt-0.5 truncate">
+            {leave.student?.prn ? `PRN ${leave.student.prn}` : 'No PRN yet'}
+            {leave.student?.rollNo ? ` · Roll ${leave.student.rollNo}` : ''}
+          </p>
+        </div>
+        {!waiting && <StatusPill status={leave.status} label={leave.status === 'APPROVED' ? 'APPROVED' : 'NOT APPROVED'} />}
+      </div>
+
+      <div className="flex items-center mt-3">
+        <Calendar size={15} className="text-primary mr-1.5 shrink-0" />
+        <p className="text-light-text text-sm font-semibold">
+          {formatLeaveRange(leave.fromDate, leave.toDate)}
+          <span className="text-light-muted font-medium">
+            {' '}
+            · {days} {days === 1 ? 'day' : 'days'}
+          </span>
+        </p>
+      </div>
+      <p className="text-light-muted text-sm font-medium mt-2 break-words">{leave.reason}</p>
+      {leave.reviewNote && <p className="text-light-subtle text-xs font-medium mt-2">Your note: {leave.reviewNote}</p>}
+
+      {waiting ? (
+        <div className="flex gap-3 mt-4">
+          <Button title="Reject" variant="dangerSoft" size="sm" icon={X} onClick={onReject} className="flex-1" />
+          <Button title="Approve" size="sm" icon={Check} onClick={onApprove} className="flex-1" />
+        </div>
+      ) : leave.status === 'APPROVED' ? (
+        <Button title="Take back approval" variant="ghost" size="sm" onClick={onRevoke} className="mt-2 !px-0" />
+      ) : (
+        <Button title="Approve instead" variant="ghost" size="sm" onClick={onApprove} className="mt-2 !px-0" />
+      )}
     </Card>
   );
 }

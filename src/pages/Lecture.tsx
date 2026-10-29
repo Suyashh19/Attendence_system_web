@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, ArrowLeft, Users } from 'lucide-react';
@@ -5,8 +6,10 @@ import { getSessionDetails, editAttendanceRecord } from '../lib/attendance';
 import { getErrorMessage } from '../lib/api';
 import { MIN_ATTENDANCE_PERCENT } from '../theme';
 import { ScreenHeader } from '../components/Layout';
-import { Avatar, Button, Card, EmptyState, ProgressRing, SectionLabel, Spinner, StatusPill } from '../components/ui';
+import { Avatar, Button, Card, EmptyState, ProgressRing, SectionLabel, StatusPill } from '../components/ui';
+import { ListSkeleton } from '../components/Skeleton';
 import { toast } from '../components/Dialog';
+import type { SessionDetailsResponse } from '../types';
 
 /** One lecture's roster; tap a status to correct it. */
 export default function LecturePage() {
@@ -21,21 +24,56 @@ export default function LecturePage() {
     enabled: !!sessionId,
   });
 
+  // Students whose change is still on its way to the server; their button waits so taps cannot overlap
+  const [saving, setSaving] = useState<Set<number>>(new Set());
+  const setSavingFor = (studentId: number, on: boolean) =>
+    setSaving((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(studentId);
+      else next.delete(studentId);
+      return next;
+    });
+
+  const detailsKey = ['session-details', sessionId];
+
+  // The new status shows at once; the server catches up in the background and the old one returns if it refuses
   const editMutation = useMutation({
+    mutationKey: ['edit-attendance'],
     mutationFn: ({ studentId, status }: { studentId: number; status: string }) => editAttendanceRecord(sessionId, studentId, status),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['session-details', sessionId] });
+    onMutate: async ({ studentId, status }) => {
+      setSavingFor(studentId, true);
+      await queryClient.cancelQueries({ queryKey: detailsKey });
+      const previous = queryClient.getQueryData<SessionDetailsResponse>(detailsKey);
+      queryClient.setQueryData<SessionDetailsResponse>(detailsKey, (old) =>
+        old
+          ? {
+              ...old,
+              students: old.students.map((st) =>
+                st.id === studentId ? { ...st, status: status as typeof st.status, editedByFaculty: true, reason: null } : st
+              ),
+            }
+          : old
+      );
+      return { previous };
+    },
+    onError: (err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(detailsKey, context.previous);
+      toast(getErrorMessage(err, 'Failed to update attendance.'), 'error');
+    },
+    onSettled: (_data, _err, { studentId }) => {
+      setSavingFor(studentId, false);
+      // Refetch once the last pending change has landed, so an older answer cannot undo a newer tap
+      if (queryClient.isMutating({ mutationKey: ['edit-attendance'] }) <= 1) queryClient.invalidateQueries({ queryKey: detailsKey });
       queryClient.invalidateQueries({ queryKey: ['recent-sessions'] });
       queryClient.invalidateQueries({ queryKey: ['subject-analytics'] });
     },
-    onError: (err) => toast(getErrorMessage(err, 'Failed to update attendance.'), 'error'),
   });
 
   if (isLoading) {
     return (
       <div>
         <ScreenHeader title="Lecture" back />
-        <Spinner className="pt-20" />
+        <ListSkeleton className="p-4 pt-6" />
       </div>
     );
   }
@@ -108,9 +146,8 @@ export default function LecturePage() {
               <button
                 type="button"
                 onClick={() => editMutation.mutate({ studentId: item.id, status: item.status === 'PRESENT' ? 'ABSENT' : 'PRESENT' })}
-                disabled={editMutation.isPending}
+                disabled={saving.has(item.id)}
                 aria-label={`${item.name} is ${item.status}. Tap to change.`}
-                className={editMutation.isPending ? 'opacity-60' : ''}
               >
                 <StatusPill status={item.status} edited={item.editedByFaculty} />
               </button>

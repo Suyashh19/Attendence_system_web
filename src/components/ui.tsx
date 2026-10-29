@@ -138,7 +138,7 @@ export function Chip({ label, selected = false, onClick, icon: Icon, tone = 'pri
       type="button"
       onClick={onClick}
       aria-pressed={selected}
-      className={`tap h-9 px-4 rounded-full border text-[13px] font-bold flex items-center whitespace-nowrap ${
+      className={`tap h-9 px-4 rounded-full border text-[13px] font-bold flex items-center whitespace-nowrap shrink-0 ${
         selected ? on : 'bg-light-card text-light-muted border-light-border'
       } ${className}`}
     >
@@ -148,11 +148,11 @@ export function Chip({ label, selected = false, onClick, icon: Icon, tone = 'pri
   );
 }
 
-export function StatusPill({ status, edited = false }: { status: string; edited?: boolean }) {
+export function StatusPill({ status, label, edited = false }: { status: string; /** Shown instead of the raw status */ label?: string; edited?: boolean }) {
   const tone = statusTone(status);
   return (
     <span className={`inline-flex items-center px-3 h-8 rounded-full text-[11px] font-bold tracking-wide ${tone.bg} ${tone.text}`}>
-      {status}
+      {label ?? status}
       {edited && <Pencil size={10} className="ml-1.5" />}
     </span>
   );

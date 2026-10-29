@@ -1,7 +1,9 @@
 import React from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Library, BarChart3, User, ChevronLeft, CloudSun } from 'lucide-react';
 import { useServerStatus } from '../lib/api';
+import { useSocket } from '../hooks/useSocket';
 
 const TABS = [
   { to: '/', label: 'Classes', icon: Library },
@@ -11,6 +13,17 @@ const TABS = [
 
 /** The signed-in shell: the page plus the bottom tab bar. */
 export function TabLayout() {
+  const queryClient = useQueryClient();
+
+  // A leave request was sent or answered: refresh the lists, and the attendance an approval changed
+  useSocket({
+    onLeaveUpdated: () => {
+      queryClient.invalidateQueries({ queryKey: ['subject-leaves'] });
+      queryClient.invalidateQueries({ queryKey: ['subject-analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['session-details'] });
+    },
+  });
+
   return (
     <div className="min-h-dvh flex flex-col max-w-md mx-auto bg-light">
       <main className="flex-1 pb-28">
