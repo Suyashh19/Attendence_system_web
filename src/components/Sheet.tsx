@@ -33,15 +33,15 @@ export function Sheet({ open, onClose, title, subtitle, children, tall = false }
     <div className="fixed inset-0 z-40 flex items-end justify-center" role="dialog" aria-modal aria-label={title}>
       <div className="absolute inset-0 bg-navy/55 animate-fade-in" onClick={onClose} />
       <div
-        className={`relative w-full max-w-md bg-light-card rounded-t-[28px] px-6 pt-3 pb-safe animate-sheet-up flex flex-col ${
-          tall ? 'h-[88dvh]' : 'max-h-[92dvh]'
+        className={`relative w-full max-w-md bg-light-card rounded-t-[28px] px-5 pt-2.5 pb-safe animate-sheet-up flex flex-col ${
+          tall ? 'h-[84dvh]' : 'max-h-[88dvh]'
         }`}
       >
         <div className="w-10 h-1.5 rounded-full bg-light-border mx-auto mb-4 shrink-0" />
-        <div className="flex items-start mb-5 shrink-0">
+        <div className="flex items-start mb-4 shrink-0">
           <div className="flex-1 mr-3">
-            <h2 className="text-light-text text-xl font-extrabold">{title}</h2>
-            {subtitle && <p className="text-light-muted text-sm font-medium mt-1 leading-5">{subtitle}</p>}
+            <h2 className="text-light-text text-lg font-extrabold">{title}</h2>
+            {subtitle && <p className="text-light-muted text-[13px] font-medium mt-0.5 leading-[18px]">{subtitle}</p>}
           </div>
           <button
             type="button"

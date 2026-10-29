@@ -74,7 +74,7 @@ export function ClassFilterSheet({ open, onClose, filters, onChange, years, coun
       {subjects && subjects.length > 0 && (
         <>
           <p className="text-light-text font-semibold mb-2 ml-1 text-[13px]">Subject</p>
-          <div className="flex gap-2 overflow-x-auto -mx-6 px-6 pb-1 mb-4">
+          <div className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-1 mb-4">
             <Chip label="All subjects" selected={!filters.subjectId} onClick={() => onChange({ ...filters, subjectId: null })} />
             {subjects.map((s) => (
               <Chip

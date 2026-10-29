@@ -67,3 +67,16 @@ textarea {
 .animate-fade-in {
   animation: fade-in 0.2s ease-out;
 }
+
+/* Phone-sized base text: every rem-based size and gap scales from this */
+html {
+  font-size: 14px;
+}
+
+/* Horizontal chip rows scroll by swipe; no bar needed */
+.overflow-x-auto {
+  scrollbar-width: none;
+}
+.overflow-x-auto::-webkit-scrollbar {
+  display: none;
+}

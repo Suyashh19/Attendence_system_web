@@ -18,7 +18,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
 
 const SIZES = {
   sm: { box: 'h-11 px-4 rounded-xl text-sm', icon: 16 },
-  md: { box: 'h-[52px] px-6 rounded-2xl text-base', icon: 18 },
+  md: { box: 'h-[46px] px-5 rounded-2xl text-[15px]', icon: 18 },
 };
 
 interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'title'> {
@@ -76,14 +76,14 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Inp
 ) {
   const inputId = id ?? (label ? `input-${label.replace(/\s+/g, '-').toLowerCase()}` : undefined);
   return (
-    <div className={`mb-4 ${className}`}>
+    <div className={`mb-3 ${className}`}>
       {label && (
-        <label htmlFor={inputId} className="block text-light-text font-semibold mb-2 ml-1 text-[13px]">
+        <label htmlFor={inputId} className="block text-light-text font-semibold mb-1.5 ml-1 text-[13px]">
           {label}
         </label>
       )}
       <div
-        className={`flex items-center bg-light-card border rounded-2xl px-4 h-[52px] focus-within:border-primary ${
+        className={`flex items-center bg-light-card border rounded-2xl px-4 h-[46px] focus-within:border-primary ${
           error ? 'border-danger' : 'border-light-border'
         }`}
       >
@@ -247,7 +247,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
             role="tab"
             aria-selected={selected}
             onClick={() => onChange(key)}
-            className={`flex-1 min-w-0 h-10 px-1 rounded-xl text-[13px] font-bold flex items-center justify-center transition-colors ${
+            className={`flex-1 min-w-0 h-9 px-1 rounded-xl text-[13px] font-bold flex items-center justify-center transition-colors ${
               selected ? 'bg-primary text-white' : 'text-light-muted'
             }`}
           >

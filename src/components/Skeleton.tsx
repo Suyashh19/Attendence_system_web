@@ -7,7 +7,7 @@ function Block({ className = '' }: { className?: string }) {
 function CardSkeleton() {
   return (
     <div className="bg-light-card rounded-3xl p-4 border border-light-border shadow-card mb-3 flex items-center">
-      <Block className="w-[52px] h-[52px] rounded-2xl mr-3 shrink-0" />
+      <Block className="w-[46px] h-[46px] rounded-2xl mr-3 shrink-0" />
       <div className="flex-1 min-w-0 mr-3">
         <Block className="h-4 rounded-md w-3/5 mb-2.5" />
         <Block className="h-3 rounded-md w-2/5" />

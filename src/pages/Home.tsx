@@ -383,7 +383,7 @@ function SubjectCard({ subject, live, onOpen, onStart }: { subject: Subject; liv
     <div className={`bg-light-card rounded-3xl p-4 border shadow-card mb-3 ${live ? 'border-success' : 'border-light-border'}`}>
       <button type="button" onClick={onOpen} className="w-full flex items-center text-left" aria-label={`Open ${subject.name}`}>
         <span
-          className={`w-[52px] h-[52px] rounded-2xl flex items-center justify-center mr-3 shrink-0 ${
+          className={`w-[46px] h-[46px] rounded-2xl flex items-center justify-center mr-3 shrink-0 ${
             practical ? 'bg-gold-bg text-gold' : 'bg-light-primaryBg text-primary'
           }`}
         >

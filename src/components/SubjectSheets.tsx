@@ -128,7 +128,7 @@ export function CreateSubjectSheet({ open, onClose, onSuccess, subject, prefill 
         />
 
         <p className="text-light-text font-semibold mb-2 ml-1 text-[13px]">Academic year (optional)</p>
-        <div className="flex gap-2 overflow-x-auto -mx-6 px-6 pb-1 mb-4">
+        <div className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-1 mb-4">
           {yearOptions.map((year) => (
             <Chip
               key={year}
@@ -214,7 +214,7 @@ export function ExportSheet({ open, onClose, subjects, initialSubjectId, loading
   return (
     <Sheet open={open} onClose={onClose} title="Download report" subtitle={selected ? subjectSubtitle(selected) : "An Excel sheet of every student's status for each lecture."}>
       <p className="text-light-muted font-bold text-xs tracking-widest mb-3">SUBJECT</p>
-      <div className="flex gap-2 overflow-x-auto -mx-6 px-6 pb-1 mb-6">
+      <div className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-1 mb-6">
         {subjects.map((s) => {
           const isSelected = s.id === subjectId;
           return (
@@ -235,7 +235,7 @@ export function ExportSheet({ open, onClose, subjects, initialSubjectId, loading
       </div>
 
       <p className="text-light-muted font-bold text-xs tracking-widest mb-3">DATE RANGE</p>
-      <div className="flex gap-2 overflow-x-auto -mx-6 px-6 pb-1 mb-3">
+      <div className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-1 mb-3">
         {RANGE_PRESETS.map(({ key, label }) => (
           <Chip key={key} label={label} selected={rangeKey === key} onClick={() => pickPreset(key)} />
         ))}

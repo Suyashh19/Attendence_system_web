@@ -333,7 +333,7 @@ function SubjectView({ subject }: { subject: Subject }) {
 
         {tab === 'students' && approved.length > 0 && (
           <div className="mb-4">
-            <div className="flex items-center bg-light-card border border-light-border rounded-2xl px-4 h-[52px] mb-3 focus-within:border-primary">
+            <div className="flex items-center bg-light-card border border-light-border rounded-2xl px-4 h-[46px] mb-3 focus-within:border-primary">
               <Search size={18} className="text-light-subtle mr-2.5 shrink-0" />
               <input
                 type="search"

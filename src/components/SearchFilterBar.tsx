@@ -20,7 +20,7 @@ export function SearchFilterBar({ value, onChange, placeholder, filterCount, onO
   return (
     <div>
       <div className="flex items-center">
-        <div className="flex-1 min-w-0 flex items-center bg-light-card border border-light-border rounded-2xl px-4 h-[52px] focus-within:border-primary">
+        <div className="flex-1 min-w-0 flex items-center bg-light-card border border-light-border rounded-2xl px-4 h-[46px] focus-within:border-primary">
           <Search size={18} className="text-light-subtle mr-2.5 shrink-0" />
           <input
             type="search"
@@ -43,7 +43,7 @@ export function SearchFilterBar({ value, onChange, placeholder, filterCount, onO
           type="button"
           onClick={onOpenFilters}
           aria-label={active ? `Filters, ${filterCount} on` : 'Filters'}
-          className={`tap relative ml-3 w-[52px] h-[52px] rounded-2xl flex items-center justify-center border shrink-0 ${
+          className={`tap relative ml-3 w-[46px] h-[46px] rounded-2xl flex items-center justify-center border shrink-0 ${
             active ? 'bg-navy border-navy text-white' : 'bg-light-card border-light-border text-light-muted'
           }`}
         >
